@@ -1,0 +1,31 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+@import "daisyui";
+
+/* th,
+td {
+  width: 200px !important;
+}
+th:nth-child(1),
+td:nth-child(1) {
+  width: 50px !important;
+}
+th:nth-child(4),
+td:nth-child(4),
+th:nth-child(6),
+td:nth-child(6) {
+  width: 75px !important;
+}
+th:nth-child(5),
+td:nth-child(5),
+th:nth-child(6),
+td:nth-child(6) {
+  width: 20px !important;
+  margin: 0 !important;
+} */
+
+thead{
+ 
+
+}
