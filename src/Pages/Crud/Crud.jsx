@@ -1,143 +1,180 @@
-import React, { useEffect, useState } from "react";
-import "../../firebase/config";
-import { getAuth, signOut } from "firebase/auth";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { signOut } from "firebase/auth";
+import { toast } from "react-toastify";
+import { auth } from "../../firebase/config";
+import { useAuth } from "../../firebase/useAuth";
 import Create from "./Create";
-import { ToastContainer, toast } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
 import { CreateContext } from "./CreateContext";
+import {
+  FIELDS,
+  fieldLabel,
+  formatTime,
+  isDuplicate,
+  loadItems,
+  normalize,
+  saveItems,
+  validate,
+} from "./storage";
+
+const getInitialTheme = () => document.documentElement.dataset.theme || "dark";
 
 const Crud = () => {
-  const [data, setData] = useState([]);
+  const { user } = useAuth();
+  const [items, setItems] = useState(() => loadItems(user.uid));
 
-  let navigate = useNavigate();
+  const [search, setSearch] = useState("");
+  const [fieldFilter, setFieldFilter] = useState("");
+  const [sortOrder, setSortOrder] = useState("");
 
-  const outHandler = () => {
-    signOut(getAuth()).then(() => {
-      navigate("/");
-    });
-  };
+  const [edit, setEdit] = useState(null);
+  const [draft, setDraft] = useState({ name: "", field: "", age: "" });
+  const [errors, setErrors] = useState({});
+
+  const [isOpen, setIsOpen] = useState(false);
+  const [theme, setTheme] = useState(getInitialTheme);
 
   useEffect(() => {
+    document.documentElement.dataset.theme = theme;
     try {
-      const item = JSON.parse(localStorage.getItem("items"));
-      if (item) {
-        setData(item);
-      }
-    } catch (e) {
-      console.error("Invalid JSON in localStorage", e);
+      localStorage.setItem("theme", theme);
+    } catch {
+      // tema faqat shu sessiya uchun qoladi
     }
-  }, []);
+  }, [theme]);
 
-  function deleteItem(parametr) {
-    try {
-      let user = JSON.parse(localStorage.getItem("items"));
-      const deleteUSer = user.filter((value) => value.key != parametr);
-      localStorage.setItem("items", JSON.stringify(deleteUSer));
-      setData(deleteUSer);
-    } catch (e) {
-      console.error("Failed to delete item", e);
-    }
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKeyDown = (e) => e.key === "Escape" && setIsOpen(false);
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [isOpen]);
+
+  function persist(nextItems) {
+    setItems(nextItems);
+    saveItems(user.uid, nextItems);
   }
 
-  const [name, setName] = useState("");
-  const [field, setField] = useState("");
-  const [age, setAge] = useState("");
-  const [edit, setEdit] = useState(null);
+  // Qidiruv, filter va saralash birgalikda ishlaydi; saqlangan tartib o'zgarmaydi
+  const visibleItems = useMemo(() => {
+    const query = normalize(search);
+    let result = items.filter(
+      (item) =>
+        (!query || normalize(item.name).includes(query)) &&
+        (!fieldFilter || normalize(item.field) === fieldFilter)
+    );
+    if (sortOrder) {
+      result = [...result].sort((a, b) =>
+        sortOrder === "a-z"
+          ? a.name.localeCompare(b.name)
+          : b.name.localeCompare(a.name)
+      );
+    }
+    return result;
+  }, [items, search, fieldFilter, sortOrder]);
 
-  function changeHandler(parametr) {
-    setEdit(parametr.key);
-    setName(parametr.name);
-    setField(parametr.field);
-    setAge(parametr.age);
+  const outHandler = () => {
+    signOut(auth).catch(() => toast.error("Chiqishda xatolik yuz berdi"));
+  };
+
+  function deleteItem(item) {
+    if (!window.confirm(`"${item.name}" o'chirilsinmi?`)) return;
+    persist(items.filter((value) => value.key !== item.key));
+    if (edit === item.key) setEdit(null);
+    toast.success("Foydalanuvchi o'chirildi");
+  }
+
+  function changeHandler(item) {
+    setEdit(item.key);
+    setDraft({ name: item.name, field: normalize(item.field), age: String(item.age) });
+    setErrors({});
+  }
+
+  function updateDraft(key) {
+    return (e) => {
+      setDraft({ ...draft, [key]: e.target.value });
+      setErrors({ ...errors, [key]: undefined });
+    };
   }
 
   function saveHandler() {
-    if (name && field && age) {
-      try {
-        const changeData = JSON.parse(localStorage.getItem("items"));
-        const updateData = changeData.map(value => value.key == edit ? { ...value, name, field, age } : value);
-        localStorage.setItem('items', JSON.stringify(updateData));
-        setData(updateData);
-        setEdit(null);
-      } catch (e) {
-        console.error("Failed to save item", e);
-      }
-    } else {
-      document.querySelector('.inp1').classList.add('input-error');
-      document.querySelector('.inp2').classList.add('input-error');
-      document.querySelector('.inp3').classList.add('input-error');
+    const validationErrors = validate(draft);
+    if (Object.keys(validationErrors).length > 0) {
+      setErrors(validationErrors);
+      toast.error(Object.values(validationErrors)[0]);
+      return;
     }
-  }
-
-  const [isOpen, setIsOpen] = useState(false);
-  function createHandler() {
-    setIsOpen(true);
-  }
-
-  function searchHandler(e) {
-    let userData = e.target.value;
-    if (userData) {
-      let findUser = JSON.parse(localStorage.getItem('items'));
-      let findOut = findUser.filter(value => value.name.includes(userData));
-      setData(findOut);
-    } else {
-      setData(JSON.parse(localStorage.getItem('items')));
+    if (isDuplicate(items, draft, edit)) {
+      toast.error("Bunday foydalanuvchi mavjud");
+      return;
     }
+    persist(
+      items.map((value) =>
+        value.key === edit
+          ? { ...value, name: draft.name.trim(), field: draft.field, age: Number(draft.age) }
+          : value
+      )
+    );
+    setEdit(null);
+    toast.success("O'zgarishlar saqlandi");
   }
 
-  function sortHandler(e) {
-    let sortByName = e.target.value;
-    let getByStore = JSON.parse(localStorage.getItem('items'));
-
-    if (sortByName == 'a-z') {
-      let sortedName = getByStore.sort((a, b) => a.name.localeCompare(b.name));
-      localStorage.setItem('items', JSON.stringify(sortedName));
-      setData(sortedName);
-    } else {
-      let sortedName = getByStore.sort((a, b) => b.name.localeCompare(a.name));
-      localStorage.setItem('items', JSON.stringify(sortedName));
-      setData(sortedName);
-    }
-  }
-
-  function filterHandler(e) {
-    let filterByField = e.target.value;
-    let storedData = JSON.parse(localStorage.getItem('items'));
-
-    if (filterByField) {
-      let filteredUsers = storedData.filter(user => user.field === filterByField);
-      setData(filteredUsers);
-    } else {
-      setData(storedData);
-    }
-  }
+  const contextValue = {
+    items,
+    addItem: (item) => persist([...items, item]),
+    close: () => setIsOpen(false),
+  };
 
   return (
-    <div >
-      <div>
-        <CreateContext.Provider value={{ setIsOpen, setData }}>
-          {
-            isOpen ? <div className=" w-[100vw] h-[100vh] flex justify-center items-center absolute z-10"> <Create /></div> : null
-          }
+    <div className="min-h-screen bg-base-100">
+      {isOpen && (
+        <CreateContext.Provider value={contextValue}>
+          <div
+            className="fixed inset-0 z-20 flex justify-center items-center bg-black/40 px-4"
+            onClick={(e) => e.target === e.currentTarget && setIsOpen(false)}
+          >
+            <Create />
+          </div>
         </CreateContext.Provider>
-      </div>
+      )}
 
-      <div className="flex justify-end sticky top-0 z-10 bg-[#1D232A]">
-        <select onChange={filterHandler} className="select select-success w-44 m-3">
-          <option value='frontend'>Frontend</option>
-          <option value='backend'>Backend</option>
-          <option value='android'>Android</option>
-          <option value='ios'>IOS</option>
+      <div className="flex flex-wrap items-center justify-end sticky top-0 z-10 bg-base-200 shadow">
+        <span className="mr-auto m-3 text-sm opacity-70 truncate max-w-[40%]" title={user.email}>
+          {user.email}
+        </span>
+
+        <select
+          value={fieldFilter}
+          onChange={(e) => setFieldFilter(e.target.value)}
+          className="select select-success w-44 m-3"
+          aria-label="Filter by field"
+        >
+          <option value="">All fields</option>
+          {FIELDS.map((f) => (
+            <option key={f.value} value={f.value}>
+              {f.label}
+            </option>
+          ))}
         </select>
 
-        <select onChange={sortHandler} className="select select-success w-20 m-3">
-          <option value='a-z'>A-Z</option>
-          <option value='z-a'>Z-A</option>
+        <select
+          value={sortOrder}
+          onChange={(e) => setSortOrder(e.target.value)}
+          className="select select-success w-28 m-3"
+          aria-label="Sort by name"
+        >
+          <option value="">Sort</option>
+          <option value="a-z">A-Z</option>
+          <option value="z-a">Z-A</option>
         </select>
 
         <label className="input input-bordered flex items-center m-3 gap-2">
-          <input type="text" onChange={searchHandler} className="grow" placeholder="Search" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="grow"
+            placeholder="Search"
+          />
           <svg
             xmlns="http://www.w3.org/2000/svg"
             viewBox="0 0 16 16"
@@ -149,14 +186,19 @@ const Crud = () => {
               clipRule="evenodd" />
           </svg>
         </label>
-        <button onClick={createHandler} className="btn btn-success m-3">Create User</button>
+        <button onClick={() => setIsOpen(true)} className="btn btn-success m-3">
+          Create User
+        </button>
         <button className="btn btn-error m-3" onClick={outHandler}>
           Log Out
         </button>
 
-        <label className="swap swap-rotate m-3">
-          {/* this hidden checkbox controls the state */}
-          <input type="checkbox" />
+        <label className="swap swap-rotate m-3" aria-label="Toggle theme">
+          <input
+            type="checkbox"
+            checked={theme === "light"}
+            onChange={(e) => setTheme(e.target.checked ? "light" : "dark")}
+          />
 
           {/* sun icon */}
           <svg
@@ -178,9 +220,7 @@ const Crud = () => {
         </label>
       </div>
 
-
-
-      <div className={isOpen ? 'blur-sm' : ''}>
+      <div className={isOpen ? "blur-sm" : ""}>
         <div className="overflow-x-auto">
           <table className="table">
             <thead className="text-[20px]">
@@ -195,38 +235,60 @@ const Crud = () => {
               </tr>
             </thead>
             <tbody className="text-[18px]">
-              {data.map((value, index) => {
+              {visibleItems.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="text-center opacity-60 py-10">
+                    {items.length === 0
+                      ? "Hali foydalanuvchilar yo'q. \"Create User\" tugmasi orqali qo'shing."
+                      : "Hech narsa topilmadi"}
+                  </td>
+                </tr>
+              )}
+              {visibleItems.map((value, index) => {
+                const isEditing = value.key === edit;
                 return (
-                  <tr key={value.key} className="capitalize">
+                  <tr key={value.key}>
                     <td>{index + 1}</td>
-                    <td>
-                      {value.key == edit ? (
+                    <td className="capitalize">
+                      {isEditing ? (
                         <input
-                          value={name}
-                          onChange={(e) => setName(e.target.value)}
-                          className="input input-accent inp1 w-[200px]"
+                          value={draft.name}
+                          onChange={updateDraft("name")}
+                          className={`input input-bordered w-[200px] ${errors.name ? "input-error" : "input-accent"}`}
                         />
                       ) : (
                         value.name
                       )}
                     </td>
                     <td>
-                      {value.key == edit ? (
-                        <input
-                          value={field}
-                          onChange={(e) => setField(e.target.value)}
-                          className="input input-accent inp2 w-[200px]"
-                        />
+                      {isEditing ? (
+                        <select
+                          value={draft.field}
+                          onChange={updateDraft("field")}
+                          className={`select select-bordered w-[200px] ${errors.field ? "select-error" : "select-accent"}`}
+                        >
+                          <option value="" disabled>
+                            Field
+                          </option>
+                          {FIELDS.map((f) => (
+                            <option key={f.value} value={f.value}>
+                              {f.label}
+                            </option>
+                          ))}
+                        </select>
                       ) : (
-                        value.field
+                        fieldLabel(value.field)
                       )}
                     </td>
                     <td>
-                      {value.key == edit ? (
+                      {isEditing ? (
                         <input
-                          value={age}
-                          onChange={(e) => setAge(e.target.value)}
-                          className="input input-accent inp3 w-20"
+                          type="number"
+                          min={1}
+                          max={120}
+                          value={draft.age}
+                          onChange={updateDraft("age")}
+                          className={`input input-bordered w-24 ${errors.age ? "input-error" : "input-accent"}`}
                         />
                       ) : (
                         value.age
@@ -235,7 +297,7 @@ const Crud = () => {
 
                     <td>
                       <button
-                        onClick={() => deleteItem(value.key)}
+                        onClick={() => deleteItem(value)}
                         className="btn btn-error text-[16px] text-white"
                       >
                         Delete
@@ -243,13 +305,15 @@ const Crud = () => {
                     </td>
 
                     <td>
-                      {value.key == edit ? (
-                        <button
-                          onClick={saveHandler}
-                          className="btn btn-success"
-                        >
-                          Save
-                        </button>
+                      {isEditing ? (
+                        <div className="flex gap-2">
+                          <button onClick={saveHandler} className="btn btn-success">
+                            Save
+                          </button>
+                          <button onClick={() => setEdit(null)} className="btn btn-ghost">
+                            Cancel
+                          </button>
+                        </div>
                       ) : (
                         <button
                           onClick={() => changeHandler(value)}
@@ -260,7 +324,7 @@ const Crud = () => {
                       )}
                     </td>
 
-                    <td>{value.year}/{value.date}-{value.month}/{value.day} <br /> {value.hour} : {value.minute} AM </td>
+                    <td className="text-[15px] whitespace-nowrap">{formatTime(value)}</td>
                   </tr>
                 );
               })}
@@ -268,13 +332,6 @@ const Crud = () => {
           </table>
         </div>
       </div>
-
-      <ToastContainer
-        position="top-center"
-        autoClose='1000'
-      >
-      </ToastContainer>
-
     </div>
   );
 };

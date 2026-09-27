@@ -1,88 +1,75 @@
-import React, { useState } from "react";
-import { NavLink, useNavigate } from "react-router-dom";
-import "../../firebase/config";
-import { getAuth, signInWithEmailAndPassword } from "firebase/auth";
-import { toast, ToastContainer } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
+import { useState } from "react";
+import { NavLink } from "react-router-dom";
+import { signInWithEmailAndPassword } from "firebase/auth";
+import { toast } from "react-toastify";
+import { auth } from "../../firebase/config";
+import { authErrorMessage } from "../../firebase/errors";
+import AuthCard from "../../components/AuthCard";
 
 const SignIn = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  let navigate = useNavigate();
-  let auth = getAuth();
   function loginHandler(e) {
     e.preventDefault();
-    signInWithEmailAndPassword(auth, email, password)
-      .then(() => {
-        toast.success("Logged in successfully");
-      })
-      .then(() => {
-        navigate("crud");
-      })
-      .catch(() => {
-        toast.error("Something went wrong");
-      });
+    setLoading(true);
+    // Muvaffaqiyatli kirganda PublicRoute avtomatik /crud ga yo'naltiradi
+    signInWithEmailAndPassword(auth, email.trim(), password)
+      .then(() => toast.success("Tizimga muvaffaqiyatli kirdingiz"))
+      .catch((error) => toast.error(authErrorMessage(error)))
+      .finally(() => setLoading(false));
   }
 
   return (
-    <div className="w-[100vw] h-[100vh] flex justify-center items-center">
-      <div className="hero  bg-base-200 min-h-screen">
-        <div className="hero-content flex-col  lg:flex-row-reverse">
-          <div className="card bg-base-100 w-[700px]  max-w-sm shrink-0 shadow-2xl">
-            <form className="card-body">
-              <div className="form-control ">
-                <label className="label">
-                  <span className="label-text">Email</span>
-                </label>
-                <input
-                  type="email"
-                  placeholder="email"
-                  className="input input-bordered"
-                  required
-                  onChange={(e) => setEmail(e.target.value)}
-                />
-              </div>
-
-              <div className="form-control">
-                <label className="label">
-                  <span className="label-text">Password</span>
-                </label>
-                <input
-                  type="password"
-                  placeholder="password"
-                  className="input input-bordered"
-                  required
-                  onChange={(e) => setPassword(e.target.value)}
-                />
-                <label className="label">
-                  <NavLink to="forgot" className="label-text-alt link link-hover">
-                    Forgot password?
-                  </NavLink>
-                </label>
-              </div>
-
-              <div className=" mt-6 w-full flex justify-between">
-                <button
-                  onClick={loginHandler}
-                  className="btn w-[48%] btn-primary"
-                >
-                  Sign In
-                </button>
-                <NavLink to="signup" className="btn w-[48%] btn-primary">
-                  Sign Up
-                </NavLink>
-              </div>
-            </form>
-          </div>
-        </div>
+    <AuthCard title="Sign In" onSubmit={loginHandler}>
+      <div className="form-control">
+        <label className="label" htmlFor="signin-email">
+          <span className="label-text">Email</span>
+        </label>
+        <input
+          id="signin-email"
+          type="email"
+          placeholder="email"
+          className="input input-bordered"
+          autoComplete="email"
+          required
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+        />
       </div>
-      <ToastContainer
-        position="top-center"
-        autoClose={1000}
-        transition:Bounce
-      />
-    </div>
+
+      <div className="form-control">
+        <label className="label" htmlFor="signin-password">
+          <span className="label-text">Password</span>
+        </label>
+        <input
+          id="signin-password"
+          type="password"
+          placeholder="password"
+          className="input input-bordered"
+          autoComplete="current-password"
+          required
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+        />
+        <label className="label">
+          <NavLink to="/forgot" className="label-text-alt link link-hover">
+            Forgot password?
+          </NavLink>
+        </label>
+      </div>
+
+      <div className="mt-6 w-full flex justify-between">
+        <button type="submit" className="btn w-[48%] btn-primary" disabled={loading}>
+          {loading ? <span className="loading loading-spinner"></span> : "Sign In"}
+        </button>
+        <NavLink to="/signup" className="btn w-[48%] btn-outline btn-primary">
+          Sign Up
+        </NavLink>
+      </div>
+    </AuthCard>
   );
 };
+
 export default SignIn;

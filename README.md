@@ -1,8 +1,31 @@
-# React + Vite
+# My CRUD
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React + Vite asosidagi CRUD ilova. Firebase Authentication orqali ro'yxatdan o'tish,
+kirish va parolni tiklash; foydalanuvchilar ro'yxatini qo'shish, tahrirlash, o'chirish,
+qidirish, yo'nalish bo'yicha filterlash va ism bo'yicha saralash.
 
-Currently, two official plugins are available:
+## Texnologiyalar
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- React 18, React Router 6
+- Firebase Authentication
+- Tailwind CSS + daisyUI (light/dark tema)
+- react-toastify
+
+## Ishga tushirish
+
+```bash
+npm install
+npm run dev      # http://localhost:5173
+npm run build    # production build (dist/)
+npm run lint     # ESLint tekshiruvi
+```
+
+## Tuzilishi
+
+- `src/firebase/` — Firebase sozlamasi, `AuthProvider` va xato matnlari
+- `src/components/Routes.jsx` — `ProtectedRoute` (faqat kirganlar uchun) va `PublicRoute`
+- `src/Pages/Login/` — Sign In, Sign Up, Forgot password sahifalari
+- `src/Pages/Crud/` — CRUD jadvali, yaratish oynasi va `storage.js` (localStorage yordamchilari)
+
+Ma'lumotlar brauzerning localStorage'ida har bir akkaunt uchun alohida
+(`items_<uid>` kaliti ostida) saqlanadi.

@@ -1,125 +1,108 @@
-import React, { useEffect, useRef, useState } from "react";
-import { Button, Form, Input } from "antd";
+import { useState } from "react";
 import { NavLink } from "react-router-dom";
-import "../../firebase/config";
-import {
-  getAuth,
-  createUserWithEmailAndPassword,
-  onAuthStateChanged,
-} from "firebase/auth";
-import { toast, ToastContainer } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
-import Crud from "../Crud/Crud";
+import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
+import { toast } from "react-toastify";
+import { auth } from "../../firebase/config";
+import { authErrorMessage } from "../../firebase/errors";
+import AuthCard from "../../components/AuthCard";
 
 const SignUp = () => {
+  const [name, setName] = useState("");
+  const [surname, setSurname] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [isLogged, setIsLogged] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  let auth = getAuth();
-  useEffect(() => {
-    onAuthStateChanged(auth, (user) => {
-      if (user) {
-        setIsLogged(true);
-      } else {
-        setIsLogged(false);
-      }
-    });
-  }, []);
-
-  function signUpHandler(e) {
+  async function signUpHandler(e) {
     e.preventDefault();
-    createUserWithEmailAndPassword(getAuth(), email, password)
-      .then(() => {
-        toast.success("Logged in successfully");
-      })
-      .catch(() => {
-        toast.error("Something went wrong");
-      });
+    setLoading(true);
+    try {
+      const { user } = await createUserWithEmailAndPassword(auth, email.trim(), password);
+      const displayName = `${name.trim()} ${surname.trim()}`.trim();
+      if (displayName) await updateProfile(user, { displayName });
+      toast.success("Ro'yxatdan muvaffaqiyatli o'tdingiz");
+    } catch (error) {
+      toast.error(authErrorMessage(error));
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
-    <>
-      {isLogged ? (
-        <Crud />
-      ) : (
-        <div className="w-[100vw] h-[100vh] flex justify-center items-center">
-          <div className="hero  bg-base-200 min-h-screen">
-            <div className="hero-content flex-col  lg:flex-row-reverse">
-              <div className="card bg-base-100 w-[700px]  max-w-sm shrink-0 shadow-2xl">
-                <form className="card-body">
-                  <div className="form-control ">
-                    <label className="label">
-                      <span className="label-text">Name</span>
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="name "
-                      className="input input-bordered"
-                    />
-                  </div>
+    <AuthCard title="Sign Up" onSubmit={signUpHandler}>
+      <div className="form-control">
+        <label className="label" htmlFor="signup-name">
+          <span className="label-text">Name</span>
+        </label>
+        <input
+          id="signup-name"
+          type="text"
+          placeholder="name"
+          className="input input-bordered"
+          autoComplete="given-name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+        />
+      </div>
 
-                  <div className="form-control">
-                    <label className="label">
-                      <span className="label-text">Surname</span>
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="surname"
-                      className="input input-bordered"
-                    />
-                  </div>
+      <div className="form-control">
+        <label className="label" htmlFor="signup-surname">
+          <span className="label-text">Surname</span>
+        </label>
+        <input
+          id="signup-surname"
+          type="text"
+          placeholder="surname"
+          className="input input-bordered"
+          autoComplete="family-name"
+          value={surname}
+          onChange={(e) => setSurname(e.target.value)}
+        />
+      </div>
 
-                  <div className="form-control">
-                    <label className="label">
-                      <span className="label-text">Email</span>
-                    </label>
-                    <input
-                      type="email"
-                      placeholder="email"
-                      className="input input-bordered"
-                      required
-                      onChange={(e) => setEmail(e.target.value)}
-                    />
-                  </div>
+      <div className="form-control">
+        <label className="label" htmlFor="signup-email">
+          <span className="label-text">Email</span>
+        </label>
+        <input
+          id="signup-email"
+          type="email"
+          placeholder="email"
+          className="input input-bordered"
+          autoComplete="email"
+          required
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+        />
+      </div>
 
-                  <div className="form-control">
-                    <label className="label">
-                      <span className="label-text">Password</span>
-                    </label>
-                    <input
-                      type="password"
-                      placeholder="password"
-                      className="input input-bordered"
-                      required
-                      onChange={(e) => setPassword(e.target.value)}
-                    />
-                  </div>
+      <div className="form-control">
+        <label className="label" htmlFor="signup-password">
+          <span className="label-text">Password</span>
+        </label>
+        <input
+          id="signup-password"
+          type="password"
+          placeholder="password (min 6)"
+          className="input input-bordered"
+          autoComplete="new-password"
+          minLength={6}
+          required
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+        />
+      </div>
 
-                  <div className=" mt-6 w-full flex justify-between">
-                    <NavLink to="/" className="btn w-[48%] btn-primary">
-                      Sign In
-                    </NavLink>
-                    <button
-                      to="signup"
-                      onClick={signUpHandler}
-                      className="btn w-[48%] btn-primary"
-                    >
-                      Sign Up
-                    </button>
-                  </div>
-                </form>
-              </div>
-            </div>
-          </div>
-          <ToastContainer
-            position="top-center"
-            autoClose={1000}
-            transition:Bounce
-          />
-        </div>
-      )}
-    </>
+      <div className="mt-6 w-full flex justify-between">
+        <NavLink to="/" className="btn w-[48%] btn-outline btn-primary">
+          Sign In
+        </NavLink>
+        <button type="submit" className="btn w-[48%] btn-primary" disabled={loading}>
+          {loading ? <span className="loading loading-spinner"></span> : "Sign Up"}
+        </button>
+      </div>
+    </AuthCard>
   );
 };
+
 export default SignUp;

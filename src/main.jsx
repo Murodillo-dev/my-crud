@@ -1,8 +1,13 @@
-import React from 'react'
-import ReactDOM from 'react-dom/client'
-import App from './App.jsx'
-import './index.css'
+import ReactDOM from "react-dom/client";
+import App from "./App.jsx";
+import "./index.css";
 
-ReactDOM.createRoot(document.getElementById('root')).render(
-        <App />
-)
+// Saqlangan temani sahifa chizilishidan oldin qo'llash
+try {
+  const savedTheme = localStorage.getItem("theme");
+  if (savedTheme) document.documentElement.dataset.theme = savedTheme;
+} catch {
+  // localStorage mavjud bo'lmasa, standart tema qoladi
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
